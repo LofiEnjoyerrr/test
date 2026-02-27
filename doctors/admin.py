@@ -20,4 +20,4 @@ class LpuInformationAdmin(admin.ModelAdmin):
 
 @admin.register(WorkPlace)
 class WorkPlaceAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('doctor', 'lpu')

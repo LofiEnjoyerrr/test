@@ -14,18 +14,24 @@ SECRET_KEY = env('SECRET_KEY')
 DEBUG = env.bool('DEBUG')
 
 ALLOWED_HOSTS = []
+INTERNAL_IPS  = ['172.18.0.1']
 
 INSTALLED_APPS = [
+    # django
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # site-packages
+    'debug_toolbar',
+    # apps
     'doctors',
 ]
 
 MIDDLEWARE = [
+    # django
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -33,6 +39,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # site-packages
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

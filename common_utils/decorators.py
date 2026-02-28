@@ -9,6 +9,7 @@ def sql_counter(func):
 
         res = func(*args, **kwargs)
 
+        print()
         total_queries = len(connection.queries)
         for i, query in enumerate(connection.queries, 1):
             print(f'Запрос: {i}')

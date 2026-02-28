@@ -33,6 +33,7 @@ class Lpu(AutoDateMixin):
         on_delete=models.SET_NULL,
         verbose_name='Сеть ЛПУ',
     )
+    services = models.ManyToManyField('doctors.Service', through='doctors.ServicePrice', verbose_name='Услуги')
 
     class Meta:
         """Мета-класс"""
@@ -97,3 +98,38 @@ class WorkPlace(AutoDateMixin):
     def __str__(self) -> str:
         """Строковое представление объекта"""
         return f'Место работы врача (#{self.doctor_id}) в ЛПУ (#{self.lpu_id})'
+
+
+class Service(AutoDateMixin):
+    """Модель: Услуга"""
+
+    name = models.CharField(max_length=300, verbose_name='Название')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Услуга'
+        verbose_name_plural = 'Услуги'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Услуга {self.name}'
+
+
+class ServicePrice(AutoDateMixin):
+    """Модель: Услуга в ЛПУ"""
+
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, verbose_name='Услуга')
+    lpu = models.ForeignKey(Lpu, on_delete=models.CASCADE, verbose_name='ЛПУ')
+
+    price = models.PositiveIntegerField(verbose_name='Цена услуги')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Услуга в ЛПУ'
+        verbose_name_plural = 'Услуги в ЛПУ'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Услуга (#{self.service_id}) в ЛПУ (#{self.lpu_id})'

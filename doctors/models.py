@@ -19,13 +19,20 @@ class Doctor(AutoDateMixin):
 
     def __str__(self) -> str:
         """Строковое представление объекта"""
-        return f'{self.surname} {self.firstname} {self.patronymic}'
+        return f'Врач ({self.surname} {self.firstname} {self.patronymic})'
 
 
 class Lpu(AutoDateMixin):
     """Модель: ЛПУ"""
 
     name = models.CharField(max_length=300, verbose_name='Название')
+    lpu_set = models.ForeignKey(
+        'doctors.LpuSet',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name='Сеть ЛПУ',
+    )
 
     class Meta:
         """Мета-класс"""
@@ -35,7 +42,23 @@ class Lpu(AutoDateMixin):
 
     def __str__(self) -> str:
         """Строковое представление объекта"""
-        return self.name
+        return f'ЛПУ {self.name}'
+
+
+class LpuSet(AutoDateMixin):
+    """Модель: Сеть ЛПУ"""
+
+    name = models.CharField(max_length=300, verbose_name='Название')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Сеть ЛПУ'
+        verbose_name_plural = 'Сети ЛПУ'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Сеть ЛПУ {self.name}'
 
 
 class LpuInformation(AutoDateMixin):

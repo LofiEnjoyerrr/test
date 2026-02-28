@@ -6,6 +6,6 @@ from doctors.models import Doctor
 
 @sql_counter
 def index(request):
-    doctors = Doctor.objects.all()[:5]
-    context = {'doctors': doctors}
-    return render(request, 'doctors/index.html', context)
+    doctors = Doctor.objects.filter(workplace__online_appointment_on=True).values('id')
+    print(doctors)
+    return render(request, 'doctors/index.html')

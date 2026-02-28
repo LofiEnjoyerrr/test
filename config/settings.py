@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # site-packages
     'debug_toolbar',
+    'django_extensions',
     # apps
     'doctors',
 ]

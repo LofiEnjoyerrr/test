@@ -7,9 +7,11 @@ from doctors.models import Doctor, Lpu, LpuSet, ServicePrice, WorkPlace
 
 @sql_counter
 def index(request):
-    qs = Doctor.objects.all()
+    qs = WorkPlace.objects.filter(doctor__firstname='Анна').select_related('doctor')
+
     list(qs)
-    print(qs.exists())
-    print(qs.exists())
-    print(qs.exists())
+
+    print(qs[0].doctor.patronymic)
+    print(qs[0].doctor.patronymic)
+
     return render(request, 'doctors/index.html', )

@@ -133,3 +133,19 @@ class ServicePrice(AutoDateMixin):
     def __str__(self) -> str:
         """Строковое представление объекта"""
         return f'Услуга (#{self.service_id}) в ЛПУ (#{self.lpu_id})'
+
+
+class Appointment(AutoDateMixin):
+    """Модель: запись на приём"""
+
+    workplace = models.ForeignKey('doctors.WorkPlace', on_delete=models.PROTECT, verbose_name='Место работы')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Запись на приём'
+        verbose_name_plural = 'Записи на приём'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Запись на приём (#{self.id}) по месту работы (#{self.workplace_id})'

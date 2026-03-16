@@ -6,17 +6,13 @@ from pygments.lexers import q
 
 from common_utils.decorators import sql_counter
 from doctors.models import Doctor, Lpu, LpuSet, ServicePrice, WorkPlace
+from doctors.serializers import IndexSerializer
 
 
 @sql_counter
 def index(request):
-    qs = (
-        Lpu.objects
-        .values('id')
-        .annotate(cnt=Count('workplace__'))
-        .values('id', 'name', 'workplace__doctor', 'cnt')
-    )
-    list(qs)
-    print(qs)
+    ser = IndexSerializer(data=request.GET)
+    ser.is_valid(raise_exception=True)
+    print(ser.validated_data)
 
     return render(request, 'doctors/index.html', )

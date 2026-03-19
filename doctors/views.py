@@ -8,40 +8,13 @@ from pygments.lexers import q
 from common_utils.decorators import sql_counter
 from doctors.models import Doctor, Lpu, LpuSet, ServicePrice, WorkPlace, Manipulation, DoctorMKBTypePractice
 from doctors.serializers import IndexSerializer
+from test import sync_manipulations_by_mkb
 
 
 @sql_counter
 def index(request):
-    doctors_ids = []
+    doctors_ids = [12]
 
-    doctors_to_sync = Doctor.objects.filter(
-        Q(id__in=doctors_ids) | Q(doctor__id__in=doctors_ids),
-        master__isnull=True,
-    ).annotate(
-        parsed_manipulations_types=Subquery(
-            Manipulation.objects.filter(
-                is_parsed=True,
-                doctor_id=OuterRef('id'),
-            )
-            .values('doctor_id')
-            .annotate(manipulations_types_ids=ArrayAgg('mtype_id', distinct=True))
-            .values('manipulations_types_ids')
-        ),
-        new_manipulations_types=Subquery(
-            DoctorMKBTypePractice.objects.filter(
-                Q(doctor_id=OuterRef('id'))
-                | Q(doctor__master_id=OuterRef('id'))
-            )
-            .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
-            .values('master_doctor')
-            .annotate(manipulations_types_ids=ArrayAgg(
-                'mkb_type__manipulation_types',
-                distinct=True,
-            ))
-            .values('manipulations_types_ids')
-        ),
-    ).distinct()
-
-    print(doctors_to_sync)
+    sync_manipulations_by_mkb(doctors_ids)
 
     return render(request, 'doctors/index.html', )

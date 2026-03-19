@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import UniqueConstraint
 
 from common_utils.mixins import AutoDateMixin
 
@@ -26,7 +27,7 @@ class Doctor(AutoDateMixin):
 
     def __str__(self) -> str:
         """Строковое представление объекта"""
-        return f'Врач ({self.surname} {self.firstname} {self.patronymic})'
+        return f'Врач (#{self.id}) ({self.surname} {self.firstname} {self.patronymic})'
 
 
 class Lpu(AutoDateMixin):
@@ -179,12 +180,18 @@ class Manipulation(AutoDateMixin):
 
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, verbose_name='Доктор')
     mtype = models.ForeignKey(ManipulationType, on_delete=models.CASCADE, verbose_name='Тип манипуляции')
+    is_parsed = models.BooleanField(default=False, db_default=False, verbose_name='Автоматическая запись')
+    frequency = models.IntegerField(null=True)
 
     class Meta:
         """Мета-класс"""
 
         verbose_name = 'Манипуляция врача'
         verbose_name_plural = 'Манипуляции врачей'
+        constraints = [
+            UniqueConstraint(fields=['doctor', 'mtype'], name="unique_doctor_mtype")
+        ]
+
 
     def __str__(self) -> str:
         """Строковое представление объекта"""

@@ -10,6 +10,13 @@ class Doctor(AutoDateMixin):
     firstname = models.CharField(max_length=100, verbose_name='Имя')
     patronymic = models.CharField(max_length=100, verbose_name='Отчество')
     age = models.PositiveSmallIntegerField(verbose_name='Возраст')
+    master = models.ForeignKey(
+        'doctors.Doctor',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        verbose_name='Мастер врача',
+    )
 
     class Meta:
         """Мета-класс"""
@@ -136,7 +143,7 @@ class ServicePrice(AutoDateMixin):
 
 
 class Appointment(AutoDateMixin):
-    """Модель: запись на приём"""
+    """Модель: Запись на приём"""
 
     workplace = models.ForeignKey('doctors.WorkPlace', on_delete=models.PROTECT, verbose_name='Место работы')
 
@@ -149,3 +156,70 @@ class Appointment(AutoDateMixin):
     def __str__(self) -> str:
         """Строковое представление объекта"""
         return f'Запись на приём (#{self.id}) по месту работы (#{self.workplace_id})'
+
+
+class ManipulationType(AutoDateMixin):
+    """Модель: Тип манипуляции"""
+
+    name = models.CharField(unique=True, verbose_name='Название типа')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Тип манипуляции'
+        verbose_name_plural = 'Типы манипуляции'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Тип манипуляции (#{self.id}) \'{self.name}\''
+
+
+class Manipulation(AutoDateMixin):
+    """Модель: Манипуляция врача"""
+
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, verbose_name='Доктор')
+    mtype = models.ForeignKey(ManipulationType, on_delete=models.CASCADE, verbose_name='Тип манипуляции')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Манипуляция врача'
+        verbose_name_plural = 'Манипуляции врачей'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Манипуляция (#{self.id}) врача (#{self.doctor_id})'
+
+
+class MKBType(AutoDateMixin):
+    """Модель: Болезнь по МКБ-10"""
+
+    code = models.CharField(unique=True, verbose_name='Код болезни')
+    manipulation_types = models.ManyToManyField(ManipulationType)
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Болезнь по МКБ-10'
+        verbose_name_plural = 'Болезни по МКБ-10'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Болезнь по МКБ-10 (#{self.id}) (#{self.code})'
+
+
+class DoctorMKBTypePractice(AutoDateMixin):
+    """Модель: Практика врача по МКБ"""
+
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, verbose_name='Доктор')
+    mkb_type = models.ForeignKey(MKBType, on_delete=models.CASCADE, verbose_name='МКБ-болезнь')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Практика врача по МКБ'
+        verbose_name_plural = 'Практики врача по МКБ'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Практика врача (#{self.id}) по МКБ (#{self.mkb_type.code})'

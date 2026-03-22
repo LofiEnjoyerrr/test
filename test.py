@@ -1,12 +1,14 @@
+from email.policy import default
 from typing import Iterable
 
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import Q, Subquery, OuterRef, F, Value, IntegerField, Count, When
+from django.db.models import Q, Subquery, OuterRef, F, Value, IntegerField, Count, When, Case
+from django.db.models.aggregates import Sum
 from django.db.models.functions import Coalesce
-from sqlparse.sql import Case
 
-from doctors.models import Doctor, Manipulation, DoctorMKBTypePractice
+from common_utils.orm import ALWAYS_FALSE_Q
+from doctors.models import Doctor, Manipulation, DoctorMKBTypePractice, DoctorPractice
 
 
 def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
@@ -51,24 +53,41 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
                 ),
                 Value([], output_field=ArrayField(IntegerField())),
             ),
-            total_appointments=Subquery(
-                DoctorPractice()
+            total_appointments=Coalesce(
+                Subquery(
+                    DoctorPractice.objects.filter(
+                        Q(doctor_id=OuterRef('id')) | Q(doctor__master_id=OuterRef('id')),
+                    )
+                    .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
+                    .values('master_doctor')
+                    .annotate(
+                        total_appointments_sum=Sum('total_appointments'),
+                    )
+                    .values('total_appointments_sum'),
+                ),
+                0,
+            ),
+            activate_mkb_manipulations=Case(
+                When(total_appointments__gte=100, then=True),
+                default=False,
             )
         )
         .distinct()
     )
 
+    # Удаляем устаревшие манипуляции и создаём новые
     manipulations_to_create = []
+    manipulations_to_delete = ALWAYS_FALSE_Q
     for doctor in doctors_to_sync:
         new_manipulations_types_ids = set(doctor.new_manipulations_types)
         existing_manipulations_types_ids = set(doctor.parsed_manipulations_types)
         manipulations_types_ids_to_delete = existing_manipulations_types_ids - new_manipulations_types_ids
 
-        Manipulation.objects.filter(
+        manipulations_to_delete |= Q(
             doctor=doctor,
             is_parsed=True,
             mtype_id__in=manipulations_types_ids_to_delete,
-        ).delete()
+        )
 
         manipulations_to_create.extend(
             [
@@ -83,6 +102,8 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
             ],
         )
 
+    Manipulation.objects.filter(manipulations_to_delete).delete()
+
     Manipulation.objects.bulk_create(
         manipulations_to_create,
         batch_size=100,
@@ -90,7 +111,28 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
     )
 
     # Обновляем активность манипуляций
-    active_manipulations_query = Q()
-    inactive_manipulations_query = Q()
+    active_manipulations_query = ALWAYS_FALSE_Q
+    inactive_manipulations_query = ALWAYS_FALSE_Q
     for doctor in doctors_to_sync:
-        ...
+        # Включаем все манипуляции (ручные и автоматические), у которых тип манипуляции совпадает с типом из МКБ
+        if doctor.activate_mkb_manipulations:
+            active_manipulations_query |= Q(
+                doctor=doctor,
+                mtype_id__in=doctor.new_manipulations_types,
+            )
+            inactive_manipulations_query |= (
+                Q(doctor=doctor) & ~Q(mtype_id__in=doctor.new_manipulations_types)
+            )
+        # Просто включаем все ручные манипуляции, автоматические выключаем
+        else:
+            active_manipulations_query |= Q(
+                doctor=doctor,
+                is_parsed=False,
+            )
+            inactive_manipulations_query |= Q(
+                doctor=doctor,
+                is_parsed=True,
+            )
+
+    Manipulation.objects.filter(active_manipulations_query).update(is_active=True)
+    Manipulation.objects.filter(inactive_manipulations_query).update(is_active=False)

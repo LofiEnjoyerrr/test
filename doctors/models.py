@@ -181,6 +181,7 @@ class Manipulation(AutoDateMixin):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, verbose_name='Доктор')
     mtype = models.ForeignKey(ManipulationType, on_delete=models.CASCADE, verbose_name='Тип манипуляции')
     is_parsed = models.BooleanField(default=False, db_default=False, verbose_name='Автоматическая запись')
+    is_active = models.BooleanField(default=True, db_default=True, verbose_name='Активность записи')
     frequency = models.IntegerField(null=True)
 
     class Meta:

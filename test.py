@@ -2,8 +2,9 @@ from typing import Iterable
 
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import Q, Subquery, OuterRef, F, Value, IntegerField, Count
+from django.db.models import Q, Subquery, OuterRef, F, Value, IntegerField, Count, When
 from django.db.models.functions import Coalesce
+from sqlparse.sql import Case
 
 from doctors.models import Doctor, Manipulation, DoctorMKBTypePractice
 
@@ -50,6 +51,9 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
                 ),
                 Value([], output_field=ArrayField(IntegerField())),
             ),
+            total_appointments=Subquery(
+                DoctorPractice()
+            )
         )
         .distinct()
     )
@@ -73,6 +77,7 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
                     mtype_id=mtype_id,
                     frequency=0,  # У автоматических манипуляций это поле не используется
                     is_parsed=True,
+                    is_active=False,
                 )
                 for mtype_id in new_manipulations_types_ids
             ],
@@ -83,3 +88,9 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
         batch_size=100,
         ignore_conflicts=True,
     )
+
+    # Обновляем активность манипуляций
+    active_manipulations_query = Q()
+    inactive_manipulations_query = Q()
+    for doctor in doctors_to_sync:
+        ...

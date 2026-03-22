@@ -230,3 +230,21 @@ class DoctorMKBTypePractice(AutoDateMixin):
     def __str__(self) -> str:
         """Строковое представление объекта"""
         return f'Практика врача (#{self.id}) по МКБ (#{self.mkb_type.code})'
+
+
+class DoctorPractice(AutoDateMixin):
+    """Модель: Практика врача"""
+
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, verbose_name='Доктор')
+
+    total_appointments = models.PositiveIntegerField(verbose_name='Общее число приёмов')
+
+    class Meta:
+        """Мета-класс"""
+
+        verbose_name = 'Практика врача'
+        verbose_name_plural = 'Практики врачей'
+
+    def __str__(self) -> str:
+        """Строковое представление объекта"""
+        return f'Практика (#{self.id}) врача (#{self.doctor_id})'

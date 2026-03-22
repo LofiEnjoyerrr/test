@@ -1,9 +1,8 @@
-from collections import defaultdict
 from typing import Iterable
 
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import Prefetch, Q, Subquery, OuterRef, F, Value, IntegerField
+from django.db.models import Q, Subquery, OuterRef, F, Value, IntegerField, Count
 from django.db.models.functions import Coalesce
 
 from doctors.models import Doctor, Manipulation, DoctorMKBTypePractice
@@ -16,39 +15,44 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
 
     :param doctors_ids: ID врачей (как мастеров, так и слейвов), данные которых нужно синхронизировать.
     """
-    doctors_to_sync = Doctor.objects.filter(
-        Q(id__in=doctors_ids) | Q(doctor__id__in=doctors_ids),
-        master__isnull=True,
-    ).annotate(
-        parsed_manipulations_types=Coalesce(
-            Subquery(
-                Manipulation.objects.filter(
-                    is_parsed=True,
-                    doctor_id=OuterRef('id'),
-                )
-                .values('doctor_id')
-                .annotate(manipulations_types_ids=ArrayAgg('mtype_id', distinct=True))
-                .values('manipulations_types_ids')
-            ),
-            Value([], output_field=ArrayField(IntegerField())),
-        ),
-        new_manipulations_types=Coalesce(
-            Subquery(
-                DoctorMKBTypePractice.objects.filter(
-                    Q(doctor_id=OuterRef('id'))
-                    | Q(doctor__master_id=OuterRef('id'))
-                )
-                .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
-                .values('master_doctor')
-                .annotate(manipulations_types_ids=ArrayAgg(
-                    'mkb_type__manipulation_types',
-                    distinct=True,
-                ))
-                .values('manipulations_types_ids')
-            ),
-            Value([], output_field=ArrayField(IntegerField())),
+    doctors_to_sync = (
+        Doctor.objects.filter(
+            Q(id__in=doctors_ids) | Q(doctor__id__in=doctors_ids),
+            master__isnull=True,
         )
-    ).distinct()
+        .annotate(
+            parsed_manipulations_types=Coalesce(
+                Subquery(
+                    Manipulation.objects.filter(
+                        is_parsed=True,
+                        doctor_id=OuterRef('id'),
+                    )
+                    .values('doctor_id')
+                    .annotate(manipulations_types_ids=ArrayAgg('mtype_id', distinct=True))
+                    .values('manipulations_types_ids'),
+                ),
+                Value([], output_field=ArrayField(IntegerField())),
+            ),
+            new_manipulations_types=Coalesce(
+                Subquery(
+                    DoctorMKBTypePractice.objects.filter(
+                        Q(doctor_id=OuterRef('id')) | Q(doctor__master_id=OuterRef('id')),
+                    )
+                    .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
+                    .values('master_doctor')
+                    .annotate(
+                        manipulations_types_ids=ArrayAgg(
+                            'mkb_type__manipulation_types',
+                            distinct=True,
+                        ),
+                    )
+                    .values('manipulations_types_ids'),
+                ),
+                Value([], output_field=ArrayField(IntegerField())),
+            ),
+        )
+        .distinct()
+    )
 
     manipulations_to_create = []
     for doctor in doctors_to_sync:
@@ -79,4 +83,3 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
         batch_size=100,
         ignore_conflicts=True,
     )
-

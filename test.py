@@ -67,10 +67,7 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
                 ),
                 0,
             ),
-            activate_mkb_manipulations=Case(
-                When(total_appointments__gte=100, then=True),
-                default=False,
-            )
+            activate_mkb_manipulations=Q(total_appointments__gte=100)
         )
         .distinct()
     )

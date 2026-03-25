@@ -138,7 +138,6 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
 class AppointmentDirection(AutoDateMixin):
     """Модель: Направление на услугу"""
 
-    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, verbose_name='Запись на услугу')
     processed_image = models.ImageField(
         max_length=IMAGE_MAX_LENGTH,
         blank=True,
@@ -147,13 +146,6 @@ class AppointmentDirection(AutoDateMixin):
         upload_to=get_service_appointment_direction_filepath,
         verbose_name='Обработанное изображение направления',
     )
-
-    class Meta:
-        verbose_name = 'Направление на услугу'
-        verbose_name_plural = 'Направления на услугу'
-
-    def __str__(self) -> str:
-        return f'Направление на услугу №{self.pk}' if self.pk else 'Новое направление на услугу'
 
     @classmethod
     def process_direction(cls, uploaded_file: FILE_UPLOADED_TYPE) -> ContentFile:
@@ -178,23 +170,14 @@ class AppointmentDirection(AutoDateMixin):
         direction_image.thumbnail(new_size, Image.Resampling.LANCZOS)
 
         output = BytesIO()
-        save_params = {
-            'format': 'JPEG',
-            'quality': self.quality,
-            'optimize': True,
-            'progressive': True  # Прогрессивный JPEG для веба
-        }
 
-        direction_image.save(output, quality=new_quality, format='JPEG')
+        direction_image.save(output, quality=new_quality, format='JPEG', optimize=True)
         output.seek(0)
 
-        base_name = os.path.splitext(self.filename)[0]
-        new_name = f"{base_name}_converted_{self.max_side}px.jpg"
+        base_name = os.path.splitext(uploaded_file.name)[0]
+        new_name = f"{base_name}.jpg"
 
         return ContentFile(output.getvalue(), name=new_name)
-
-
-
 
     @classmethod
     def _get_params_for_directon(cls, uploaded_image: Image.Image) -> AppointmentDirectionImageParams:

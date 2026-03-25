@@ -171,6 +171,7 @@ class AppointmentDirection(AutoDateMixin):
 
         output = BytesIO()
 
+        # optimize параметр работает только для JPEG
         direction_image.save(output, quality=new_quality, format='JPEG', optimize=True)
         output.seek(0)
 

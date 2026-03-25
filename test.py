@@ -161,8 +161,8 @@ class AppointmentDirection(AutoDateMixin):
         direction_image = ImageOps.exif_transpose(direction_image)
 
         processed_direction_params = cls._get_params_for_directon(direction_image)
-        new_size = AppointmentDirectionImageParams['size']
-        new_quality = AppointmentDirectionImageParams['quality']
+        new_size = processed_direction_params['size']
+        new_quality = processed_direction_params['quality']
 
         if direction_image.mode != 'RGB':
             direction_image = direction_image.convert('RGB')

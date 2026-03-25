@@ -2,9 +2,11 @@ import os
 from pathlib import Path
 
 from environ import environ
-
+from pillow_heif import register_heif_opener
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+register_heif_opener()
 
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / '.env')

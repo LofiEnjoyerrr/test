@@ -1,7 +1,20 @@
+import os
+from io import BytesIO
+
+from PIL import Image, ImageOps
+from django.core.files.base import ContentFile
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models import UniqueConstraint
 
 from common_utils.mixins import AutoDateMixin
+from doctors.types import FILE_UPLOADED_TYPE, AppointmentDirectionImageParams
+
+
+def get_service_appointment_direction_filepath(instance: 'AppointmentDirection', filename: str) -> str:
+    direction_path = f'photo/appointments_directions/appointment_{instance.appointment_id}/direction.jpg'
+    private_direction_path = os.path.join('private/', direction_path)
+    return private_direction_path
 
 
 class Doctor(AutoDateMixin):
@@ -249,3 +262,79 @@ class DoctorPractice(AutoDateMixin):
     def __str__(self) -> str:
         """Строковое представление объекта"""
         return f'Практика (#{self.id}) врача (#{self.doctor_id})'
+
+
+class AppointmentDirection(AutoDateMixin):
+    """Модель: Направление на услугу"""
+
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, verbose_name='Запись к врачу')
+    processed_image = models.ImageField(
+        max_length=200,
+        blank=True,
+        default='',
+        validators=[FileExtensionValidator(allowed_extensions=('jpeg', 'jpg', 'png', 'heic'))],
+        upload_to=get_service_appointment_direction_filepath,
+        verbose_name='Обработанное изображение направления',
+    )
+
+    @classmethod
+    def process_direction(cls, uploaded_file: FILE_UPLOADED_TYPE) -> ContentFile:
+        """
+        Сжать изображение направления.
+
+        :param uploaded_file: Сжимаемый файл изображения направления на приём.
+
+        :return: ContentFile с новым изображением
+        """
+        direction_image = Image.open(uploaded_file)
+        # Поворот изображения, если имеется тэг EXIF у файла
+        direction_image = ImageOps.exif_transpose(direction_image)
+
+        processed_direction_params = cls._get_params_for_directon(direction_image)
+        new_size = processed_direction_params['size']
+        new_quality = processed_direction_params['quality']
+
+        if direction_image.mode != 'RGB':
+            direction_image = direction_image.convert('RGB')
+
+        direction_image.thumbnail(new_size, Image.Resampling.LANCZOS)
+
+        output = BytesIO()
+
+        direction_image.save(output, quality=new_quality, format='JPEG')
+        output.seek(0)
+
+        base_name = os.path.splitext(uploaded_file.name)[0]
+        new_name = f"{base_name}.jpg"
+
+        return ContentFile(output.getvalue(), name=new_name)
+
+    @classmethod
+    def _get_params_for_directon(cls, uploaded_image: Image.Image) -> AppointmentDirectionImageParams:
+        """
+        Получить размеры (в пикселях) и качество для сжимаемого направления на приём.
+        Мы сжимаем изображения направления по следующим правилам:
+        · Если изображение по большей стороне меньше 500px, то размер изображения не изменяется, а степень сжатия 90
+        · Если изображение по большей стороне меньше 1000px, то размер изображения не изменяется, а степень сжатия 80
+        · Если изображение по большей стороне меньше 2000px, то размер изображения не изменяется, а степень сжатия 70
+        · Если изображение по большей стороне больше 2000px, то размер изображения изменяется с сохранением пропорций
+        до того размера, когда большая сторона будет равна 2000px. Степень сжатия 70.
+
+        :param uploaded_image: Сжимаемый файл изображения направления на приём.
+
+        :return: Размеры (в пикселях) и качество для сжимаемого направления на приём
+        """
+        width, height = uploaded_image.size
+        biggest_size = max(width, height)
+        if biggest_size < 500:
+            return AppointmentDirectionImageParams(size=(width, height), quality=90)
+        if biggest_size < 1000:
+            return AppointmentDirectionImageParams(size=(width, height), quality=80)
+        if biggest_size < 2000:
+            return AppointmentDirectionImageParams(size=(width, height), quality=70)
+
+        if width > height:
+            new_height = int(height * (2000 / width))
+            return AppointmentDirectionImageParams(size=(width, new_height), quality=70)
+        new_width = int(width * (2000 / height))
+        return AppointmentDirectionImageParams(size=(new_width, height), quality=70)

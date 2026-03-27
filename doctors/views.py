@@ -18,6 +18,7 @@ from doctors.serializers import IndexSerializer
 
 @sql_counter
 def index(request):
+    d = Doctor.objects.filter(master__surname='asd').update(age=12)
     return render(request, 'doctors/index.html', )
 
 

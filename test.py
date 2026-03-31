@@ -1,6 +1,7 @@
 from typing import Iterable
 
 from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.expressions import ArraySubquery
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import *
 from django.db.models.functions import Coalesce, RowNumber
@@ -263,35 +264,6 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
 
     :param doctors_ids: ID врачей (как мастеров, так и слейвов), данные которых нужно синхронизировать.
     """
-    top_mkb_subquery = (
-        DoctorMKBTypePractice.objects.filter(
-            Q(doctor_id=OuterRef(OuterRef('id'))) |
-            Q(doctor__master_id=OuterRef(OuterRef('id')))
-        )
-        .values('mkb_type_id')
-        .annotate(total=Sum('total_appointments'))
-        .order_by('-total')
-        .values('mkb_type_id')[:10]
-    )
-
-    manipulations_subquery = (
-        DoctorMKBTypePractice.objects.filter(
-            Q(doctor_id=OuterRef('id')) |
-            Q(doctor__master_id=OuterRef('id')),
-            mkb_type__manipulation_types__isnull=False,
-            mkb_type_id__in=top_mkb_subquery,
-        )
-        .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
-        .values('master_doctor')
-        .annotate(
-            manipulations_types_ids=ArrayAgg(
-                'mkb_type__manipulation_types',
-                distinct=True,
-            )
-        )
-        .values('manipulations_types_ids')
-    )
-
     doctors_to_sync = (
         Doctor.objects.filter(
             Q(id__in=doctors_ids) | Q(doctor__id__in=doctors_ids),
@@ -311,7 +283,28 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
                 Value([], output_field=ArrayField(IntegerField())),
             ),
             new_manipulations_types=Coalesce(
-                Subquery(manipulations_subquery),
+                Subquery(
+                    MKBType.objects.filter(
+                        id__in=Subquery(
+                            DoctorMKBTypePractice.objects.filter(
+                                Q(doctor_id=OuterRef(OuterRef('id'))) |
+                                Q(doctor__master_id=OuterRef(OuterRef('id')))
+                            )
+                            .values('mkb_type_id')
+                            .annotate(total=Sum('total_appointments'))
+                            .order_by('-total')
+                            .values('mkb_type_id')[:10]
+                        )
+                    )
+                    .values(val=Value(1))
+                    .annotate(
+                        manipulations_types_ids=ArrayAgg(
+                            'manipulation_types',
+                            distinct=True,
+                        )
+                    )
+                    .values('manipulations_types_ids')
+                ),
                 Value([], output_field=ArrayField(IntegerField())),
             ),
             total_appointments=Coalesce(

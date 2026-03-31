@@ -14,12 +14,13 @@ from rest_framework.views import APIView
 from common_utils.decorators import sql_counter
 from doctors.models import Doctor, Lpu, LpuSet, ServicePrice, WorkPlace, Manipulation, DoctorMKBTypePractice
 from doctors.serializers import IndexSerializer
+from test import sync_manipulations_by_mkb
 
 
-@sql_counter
+# @sql_counter
 def index(request):
-    d = Doctor.objects.filter(master__surname='asd').update(age=12)
-    return render(request, 'doctors/index.html', )
+    sync_manipulations_by_mkb([1])
+    return HttpResponse(status=status.HTTP_200_OK)
 
 
 class AjaxAPIView(APIView):

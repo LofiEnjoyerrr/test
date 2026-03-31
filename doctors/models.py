@@ -234,6 +234,7 @@ class DoctorMKBTypePractice(AutoDateMixin):
 
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, verbose_name='Доктор')
     mkb_type = models.ForeignKey(MKBType, on_delete=models.CASCADE, verbose_name='МКБ-болезнь')
+    total_appointments = models.PositiveIntegerField(default=0, db_default=0, verbose_name='Число приёмов')
 
     class Meta:
         """Мета-класс"""

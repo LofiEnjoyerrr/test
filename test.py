@@ -1,3 +1,14 @@
+from typing import Iterable
+
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import *
+from django.db.models.functions import Coalesce, RowNumber
+
+from common_utils.orm import ALWAYS_FALSE_Q
+from doctors.const import DOCTOR_PRACTICE_MIN_APPOINTMENTS
+from doctors.models import *
+
 def delete_doctors_practices_not_work_in_lpu(*, lpu_id: int, doctors_data: list[dict]):
     """
     Удаляем практики врачей, которые раньше работали в ЛПУ, но в новой выгрузке их не оказалось.
@@ -252,6 +263,35 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
 
     :param doctors_ids: ID врачей (как мастеров, так и слейвов), данные которых нужно синхронизировать.
     """
+    top_mkb_subquery = (
+        DoctorMKBTypePractice.objects.filter(
+            Q(doctor_id=OuterRef(OuterRef('id'))) |
+            Q(doctor__master_id=OuterRef(OuterRef('id')))
+        )
+        .values('mkb_type_id')
+        .annotate(total=Sum('total_appointments'))
+        .order_by('-total')
+        .values('mkb_type_id')[:10]
+    )
+
+    manipulations_subquery = (
+        DoctorMKBTypePractice.objects.filter(
+            Q(doctor_id=OuterRef('id')) |
+            Q(doctor__master_id=OuterRef('id')),
+            mkb_type_id__in=top_mkb_subquery,
+            mkb_type__manipulation_types__isnull=False,
+        )
+        .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
+        .values('master_doctor')
+        .annotate(
+            manipulations_types_ids=ArrayAgg(
+                'mkb_type__manipulation_types',
+                distinct=True,
+            )
+        )
+        .values('manipulations_types_ids')
+    )
+
     doctors_to_sync = (
         Doctor.objects.filter(
             Q(id__in=doctors_ids) | Q(doctor__id__in=doctors_ids),
@@ -271,20 +311,7 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
                 Value([], output_field=ArrayField(IntegerField())),
             ),
             new_manipulations_types=Coalesce(
-                Subquery(
-                    DoctorMKBTypePractice.objects.filter(
-                        Q(doctor_id=OuterRef('id')) | Q(doctor__master_id=OuterRef('id')),
-                    )
-                    .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
-                    .values('master_doctor')
-                    .annotate(
-                        manipulations_types_ids=ArrayAgg(
-                            'mkb_type__manipulation_types',
-                            distinct=True,
-                        ),
-                    )
-                    .values('manipulations_types_ids'),
-                ),
+                Subquery(manipulations_subquery),
                 Value([], output_field=ArrayField(IntegerField())),
             ),
             total_appointments=Coalesce(

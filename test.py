@@ -278,8 +278,8 @@ def sync_manipulations_by_mkb(doctors_ids: Iterable[int]):
         DoctorMKBTypePractice.objects.filter(
             Q(doctor_id=OuterRef('id')) |
             Q(doctor__master_id=OuterRef('id')),
-            mkb_type_id__in=top_mkb_subquery,
             mkb_type__manipulation_types__isnull=False,
+            mkb_type_id__in=top_mkb_subquery,
         )
         .annotate(master_doctor=Coalesce(F('doctor__master_id'), F('doctor_id')))
         .values('master_doctor')
